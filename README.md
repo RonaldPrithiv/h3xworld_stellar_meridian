@@ -3,6 +3,8 @@
 
 h3xWorld is a Web3 Social Media  with web3 wallet sign-in, crypto post awards and NFT post minting to support creators, artists, and digital entrepreneurs to showcase and monetize their work.
 
+https://www.loom.com/share/a0f7244f311949429f11ed4a6418e267?sid=83fe2cc2-ae0b-433e-bebc-4d79902c45ba
+
 Features:
 
 - Web3 Wallet Connect
