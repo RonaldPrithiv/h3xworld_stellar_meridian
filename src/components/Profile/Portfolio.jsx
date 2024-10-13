@@ -1,0 +1,298 @@
+import { getAuth } from 'firebase/auth';
+import { useState, useEffect, useRef } from "react";
+import { useMediaQuery } from 'react-responsive'
+import {useNavigate} from 'react-router-dom'
+import { getDatabase, ref, onValue } from "firebase/database";
+import { Soroban } from "@stellar/stellar-sdk";
+import { xlmToStroop } from "../../helpers/format";
+import { signTx, TESTNET_DETAILS } from "../../helpers/network";
+import { makePayment, getTxBuilder, getServer, XLM_DECIMALS } from "../../helpers/soroban";
+import { ERRORS } from "../../helpers/error";
+
+export default function Portfolio ({profileUser}) {
+
+    const isMobile = useMediaQuery({ query: '(max-width: 520px)' })
+    const navigate = useNavigate();
+    const auth = getAuth();
+    const user = auth.currentUser;
+    const [posts, setPosts] = useState([])
+    const [postMedia, setPostMedia] = useState(null);
+    const [postAwardType, setPostAwardType] = useState('')
+    const [postAwardSteps, setPostAwardSteps] = useState(0);
+
+    const server = getServer(TESTNET_DETAILS);
+
+    useEffect(() => {
+        const db = getDatabase();
+        const postRef = ref(db, 'Posts/' + profileUser.username + 'Portfolio');
+        onValue(postRef, (snapshot) => {
+            const data = snapshot.val();
+            setPosts(data);
+            
+        });
+    }, []);
+
+
+    function showPostMedia(postImg)
+    {
+        if(document){document.getElementById('viewPortfolioPhotoModal').showModal()}
+        setPostMedia(postImg);
+    }
+
+    function setPostAward(awardType)
+    {
+        if (awardType === 'Fiat')
+        {
+            setPostAwardType('Fiat');
+            setPostAwardSteps(1);
+        }
+        else
+        {
+            setPostAwardType('Crypto');
+            setPostAwardSteps(1);
+        }
+    }
+
+    function openModal(){
+        console.log('HELLO')
+        if(document)document.getElementById('postAwardModal').showModal()
+        
+    }
+
+    const signWithFreighter = async () => {
+        // Need to use the perviously fetched token decimals to properly display the amount value
+        const amount = Soroban.parseTokenAmount(69, XLM_DECIMALS);
+        // Get an instance of a Soroban RPC set to the selected network
+        const server = getServer(TESTNET_DETAILS);
+    
+        // Gets a transaction builder and uses it to add a "transfer" operation and build the corresponding XDR
+        const builder = await getTxBuilder(
+          'GDRERHQJ3HSLXFBJVQ47QKBFBVW3SEWTJCSTRQFOBBM7S6ORIM33I6DD',
+          xlmToStroop(props.fee).toString(),
+          server,
+          TESTNET_DETAILS.networkPassphrase,
+        );
+        const xdr = await makePayment(
+          props.tokenId,
+          Number(amount),
+          'GDRERHQJ3HSLXFBJVQ47QKBFBVW3SEWTJCSTRQFOBBM7S6ORIM33I6DD',
+          'GDRERHQJ3HSLXFBJVQ47QKBFBVW3SEWTJCSTRQFOBBM7S6ORIM33I6DD',
+          '',
+          builder,
+          server,
+        );
+        try {
+          // Signs XDR representing the "transfer" transaction
+          const signedTx = await signTx(xdr, props.pubKey, props.kit);
+          props.onTxSign(signedTx);
+        } catch (error) {
+          console.log(error);
+          props.setError(ERRORS.UNABLE_TO_SIGN_TX);
+        }
+      };
+
+    return (
+        <>
+            
+        
+        {
+            isMobile ?
+            <>
+                <div className="mx-auto text-center">
+                    <p className="text-2xl font-bold pt-8">Portfolio</p>
+                    <div className='divider divider-warning my-0 w-5/12 mx-auto'></div>
+                </div>
+                <div className="flex flex-col mx-auto px-3 gap-3 pb-8">
+                    {
+                        Object.keys(posts).map((post) => {
+                            console.log(post)
+                            return (
+                                <>
+                            <div key={post} className="card bg-transparent w-full shadow-xl">  
+                                <div className="card-body mx-auto">
+                                    <div className='flex flex-col gap-1'>
+
+                                        <div className='flex flex-row gap-2 absolute left-3'>
+                                            <div tabIndex={0} role="button" className="btn btn-outline border-warning hover:border-warning btn-circle avatar">
+                                                <div className="w-10 rounded-full">
+                                                <img
+                                                    alt="Profile Photo"
+                                                    src={posts[post].postUserPhotoURL} />
+                                                </div>
+                                            </div>
+                                            <div className='flex flex-row gap-3'>
+                                                <p className='text-lg font-bold'>{posts[post].postUserFullName}</p>
+                                                <p className='text-md pt-[2px]'>@{posts[post].postUsername}</p>
+                                            </div>
+                                        </div>
+                                        <div className='pt-12 mx-auto flex flex-col '>
+                                            <h2 className="text-xl mx-auto">{posts[post].postContent}</h2>
+                                        </div>
+                                        <div className="carousel w-64 mx-auto pt-12">
+                                            {   
+                                                posts[post].files.map((postImg) => {
+                                                    {console.log(postImg)}
+                                                    return(<div className="carousel-item w-full h-full">
+                                                        <img
+                                                            src={postImg}
+                                                            className="w-full"
+                                                            alt={posts[post].postContent}
+                                                            onClick={() => showPostMedia(postImg)}
+                                                        />
+                                                    </div>
+                                                )})
+                                            }                                    
+                                        </div>
+                                        
+
+                                    </div>
+                                    
+                                </div>
+                                <div className='flex flex-row gap-3'>
+                                    <button className='btn btn-ghost' onClick={() => updateLike()}>{posts[post].likesCount}<img src={'/like.png'} width={24} height={24}/></button>
+                                    <button className='btn btn-ghost'>{posts[post].commentsCount}<img src={'/comment.png'} width={24} height={24}/></button>
+                                    <button className='btn btn-ghost' onClick={() => openModal()}>{posts[post].commentsCount}<img src={'/postAward.png'} width={24} height={24}/></button>
+                                </div>
+                                <div className='w-full pr-3'>
+                                    <button className='btn btn-warning w-full btn-outline' onClick={() => {if(document)document.getElementById('postAwardModal').showModal()}}>Mint Post as NFT </button>
+                                </div>
+                            </div>
+                            
+                            </>
+                        )})
+                    }
+                </div>
+            </>
+
+            :
+            <>
+            <div className="mx-auto text-center">
+                <p className="text-2xl font-bold pt-8">Portfolio</p>
+                <div className='divider divider-warning my-0 w-2/12 mx-auto'></div>
+
+            </div>
+            <div className="flex flex-col w-4/12 mx-auto gap-3">
+            
+            {
+                    Object.keys(posts).map((post) => {
+                        return (
+                            <>
+                            <div key={post} className="card bg-transparent w-full shadow-xl">  
+                                <div className="card-body">
+                                    <div className='flex flex-col gap-1'>
+
+                                        <div className='flex flex-row gap-2 absolute left-3'>
+                                            <div tabIndex={0} role="button" className="btn btn-outline border-warning hover:border-warning btn-circle avatar">
+                                                <div className="w-10 rounded-full">
+                                                <img
+                                                    alt="Profile Photo"
+                                                    src={posts[post].postUserPhotoURL} />
+                                                </div>
+                                            </div>
+                                            <div className='flex flex-row gap-3'>
+                                                <p className='text-lg font-bold'>{posts[post].postUserFullName}</p>
+                                                <p className='text-md pt-[2px]'>@{posts[post].postUsername}</p>
+                                            </div>
+                                        </div>
+                                        <div className='pt-16'>
+                                            <h2 className="text-xl ">{posts[post].postContent}</h2>
+                                        </div>
+                                        <div className="carousel w-64 mx-auto pt-12">
+                                            {   
+                                                posts[post].files.map((postImg) => {
+                                                    {console.log(postImg)}
+                                                    return(<div className="carousel-item w-full h-full cursor-pointer">
+                                                        <img
+                                                            src={postImg}
+                                                            className="w-full"
+                                                            alt={posts[post].postContent}
+                                                            onClick={() => showPostMedia(postImg)}
+                                                        />
+                                                    </div>
+                                                )})
+                                                
+                                            }                                    
+                                        </div>
+                                        
+                                    </div>
+                                    
+                                </div>
+                                <div className='flex flex-row gap-3 pl-3'>
+                                    <div className='flex flex-row'>
+                                        <button className='btn btn-ghost w-1'>{posts[post].likesCount}</button>
+                                        <button className='btn btn-ghost' onClick={() => updateLike()}><img src={'/like.png'} width={24} height={24}/></button>
+                                    </div>
+                                    <div className='flex flex-row'>
+                                        <button className='btn btn-ghost w-1'>{posts[post].commentsCount}</button>
+                                        <button className='btn btn-ghost' onClick={() => updateLike()}><img src={'/comment.png'} width={24} height={24}/></button>
+                                    </div>
+                                    <div className='flex flex-row'>
+                                        <button className='btn btn-ghost w-1'>{posts[post].postAwards}</button>
+                                        <button className='btn btn-ghost' onClick={() => {if(document)document.getElementById('postAwardModal').showModal()}}><img src={'/postAward.png'} width={24} height={24}/></button>
+                                    </div>
+                                </div>
+                                <div className='w-full'>
+                                    <button className='btn btn-warning w-full btn-outline'>Mint Post as NFT </button>
+                                </div>
+                            </div>
+                        
+                        </>
+                    )})
+                }
+        </div>
+        <dialog id="viewPortfolioPhotoModal" className="modal">
+            <div className="modal-box bg-stone-900">
+                <form method="dialog">
+                {/* if there is a button in form, it will close the modal */}
+                <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+                </form>
+                <>
+                    <div className="carousel-item w-full h-full cursor-pointer">
+                        <img
+                            src={postMedia}
+                            className="w-full"
+                            onClick={() => {if(document){document.getElementById('viewPortfolioPhotoModal').showModal()}}}
+                        />
+                    </div>
+                </>                                 
+            </div>
+        </dialog>
+        <dialog id="postAwardModal" className="modal">
+            <div className="modal-box bg-stone-900">
+                <form method="dialog">
+                {/* if there is a button in form, it will close the modal */}
+                <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+                </form>
+                <div className='flex flex-row justify-center'>
+                    {
+                        postAwardSteps > 0 ?
+
+                        <>
+                            <button className='btn btn-ghost bg-transparent text-white hover:text-warning absolute left-0'  onClick={() => setPostAwardSteps(postAwardSteps-1)}><span className="material-symbols-outlined">arrow_back</span></button>
+                            <p className='text-2xl text-center'>Post Award</p> 
+                        </>
+
+                        :
+                        <>
+                            <p className='text-2xl text-center'>Post Award</p> 
+                        </>
+                    }
+                </div>
+                <div className='divider divider-warning mb-0'></div>
+                
+                    <div className='flex flex-col gap-6 pt-3'>
+                        <div className='flex flex-row gap-3 items-center justify-center'>
+                            <select className='select select-bordered select-warning bg-stone-900 w-3/12'>
+                                <option>XLM</option>
+                            </select>
+                            <input className='input input-bordered input-warning bg-transparent w-full' placeholder='Post Award Amount'></input>
+                        </div>
+                        <button className='btn btn-warning w-full' onClick={() => signWithFreighter()}>Confirm</button>
+                    </div>                              
+            </div>
+        </dialog>
+        </>
+        }
+    </>
+    )
+}
